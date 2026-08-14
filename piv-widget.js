@@ -2,11 +2,9 @@
   var root = document.getElementById("piv-root");
   if (!root) return;
 
-  // Cheile se citesc din atributele data-* puse pe div-ul #piv-root din pagina 123
-  // (asa nu mai e nevoie de niciun cod JS in caseta de embed a site-ului)
   var GOOGLE_MAPS_API_KEY = root.getAttribute("data-maps-key") || "";
   var APPS_SCRIPT_URL = root.getAttribute("data-backend-url") || "";
-  var DEFAULT_CENTER = { lat: 45.9432, lng: 24.9668 }; // centrul Romaniei, fallback
+  var DEFAULT_CENTER = { lat: 45.9432, lng: 24.9668 };
   var MAX_PHOTO_MB = 5;
 
   root.innerHTML =
@@ -21,7 +19,6 @@
       '<div class="piv-hint">Atinge / da click pe harta exact unde ai vazut planta invaziva, apoi adauga poze.</div>' +
       '<button class="piv-locate" id="piv-locate-btn" type="button">\uD83D\uDCCD Locatia mea</button>' +
       '<div class="piv-manual-loc" id="piv-manual-loc">' +
-        '<a href="' + (root.getAttribute("data-locate-url") || "#") + '" target="_blank" rel="noopener" id="piv-manual-link">GPS nu merge aici? Deschide-l separat \u2197</a>' +
         '<div class="piv-manual-row">' +
           '<input type="text" id="piv-manual-input" placeholder="ex: 45.943, 24.966">' +
           '<button type="button" id="piv-manual-go">Mergi</button>' +
@@ -65,7 +62,7 @@
     }, ms || 3200);
   }
 
-  function amp() { return String.fromCharCode(38); } // "&" construit din cod, nu scris direct
+  function amp() { return String.fromCharCode(38); }
 
   function leafIcon() {
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34">'
@@ -99,16 +96,11 @@
 
     loadExistingReports();
 
-    if (!root.getAttribute("data-locate-url")) {
-      var manualLink = document.getElementById("piv-manual-link");
-      if (manualLink) manualLink.style.display = "none";
-    }
-
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(function (pos) {
         map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         map.setZoom(13);
-      }, function () { /* refuzat / indisponibil - ramane centrul implicit */ });
+      }, function () { });
     }
   }
 
@@ -197,9 +189,6 @@
     }
   });
 
-  // Trimitere prin formular ascuns + iframe invizibil (ocoleste blocajul
-  // de fetch/XHR din sandbox-ul iframe al 123, care permite navigare/formulare
-  // dar nu cereri AJAX catre alte domenii)
   var pivFrame = document.createElement("iframe");
   pivFrame.name = "piv-hidden-frame";
   pivFrame.style.display = "none";
@@ -208,7 +197,7 @@
   var submitPending = false;
 
   pivFrame.addEventListener("load", function () {
-    if (!submitPending) return; // ignora incarcarea initiala goala a iframe-ului
+    if (!submitPending) return;
     submitPending = false;
     var btn = document.getElementById("piv-submit-btn");
     btn.disabled = false; btn.textContent = "Trimite";
@@ -233,8 +222,6 @@
       submittedAt: new Date().toISOString()
     };
 
-    // afisam imediat markerul local (cu pozele alese de utilizator),
-    // nu asteptam raspunsul serverului ca sa stim ca s-a trimis
     addReportMarker({
       lat: lat, lng: lng, description: payload.description,
       photos: payload.photos.map(function (p) { return p.dataUrl; })
@@ -257,8 +244,6 @@
     form.submit();
     form.remove();
 
-    // plasa de siguranta: daca evenimentul "load" nu se declanseaza
-    // (unele sandbox-uri il suprima), reactiveaza butonul oricum dupa 4s
     setTimeout(function () {
       if (submitPending) {
         submitPending = false;
@@ -270,14 +255,12 @@
 
   function loadExistingReports() {
     if (!APPS_SCRIPT_URL) return;
-    // JSONP prin tag <script> in loc de fetch, ca sa functioneze si in
-    // sandbox-uri care blocheaza cererile AJAX catre alte domenii
     window.__pivReports = function (list) {
       (list || []).forEach(addReportMarker);
     };
     var s = document.createElement("script");
     s.src = APPS_SCRIPT_URL + "?callback=__pivReports";
-    s.onerror = function () { /* silent */ };
+    s.onerror = function () { };
     document.body.appendChild(s);
   }
 
