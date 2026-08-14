@@ -89,6 +89,12 @@
   font-size: 11.5px;
 }
 #piv-root .piv-manual-row { display: flex; gap: 4px; }
+#piv-root .piv-manual-loc a {
+  display: block;
+  color: var(--piv-forest-dark);
+  text-decoration: underline;
+  margin-bottom: 6px;
+}
 #piv-root .piv-manual-row input {
   flex: 1;
   min-width: 0;
