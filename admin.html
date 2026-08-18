@@ -4,39 +4,53 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Administrare raportări — plante invazive</title>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB312oZd4k4TYqDe2Yk0-nK4wUiFcwzHKA"></script>
 <style>
-  body { font-family: -apple-system, "Segoe UI", Arial, sans-serif; background:#eaf0e9; margin:0; padding:20px 14px 60px; color:#1c231f; }
-  .wrap { max-width:720px; margin:0 auto; }
-  h1 { font-size:19px; color:#2f5c46; margin:0 0 4px; }
-  p.sub { font-size:13px; color:#556357; margin:0 0 16px; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Arial, sans-serif; background:#eaf0e9; margin:0; padding:0; color:#1c231f; }
+  .wrap { max-width:1200px; margin:0 auto; padding:20px; }
+  h1 { font-size:20px; color:#2f5c46; margin:0 0 6px; }
+  .sub { font-size:13px; color:#556357; margin:0 0 16px; }
   .login-card { background:#fff; border-radius:14px; padding:20px; box-shadow:0 2px 10px rgba(0,0,0,0.08); max-width:360px; margin:0 auto; }
   .login-card label { font-size:13px; font-weight:600; display:block; margin-bottom:6px; }
   .login-card input { width:100%; padding:10px; border:1px solid #d7e0d5; border-radius:8px; font-size:14px; margin-bottom:10px; }
-  .login-card button, .toolbar button { width:100%; padding:11px; border:none; border-radius:8px; background:#2f5c46; color:#fff; font-weight:700; font-size:14px; cursor:pointer; }
+  .login-card button { width:100%; padding:11px; border:none; border-radius:8px; background:#2f5c46; color:#fff; font-weight:700; font-size:14px; cursor:pointer; }
   .status { font-size:13px; color:#a34a28; margin-top:8px; min-height:16px; }
-  .toolbar { display:flex; gap:8px; margin-bottom:14px; }
-  .toolbar button { width:auto; padding:9px 14px; font-size:13px; }
+  
+  #app { display:none; }
+  .toolbar { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+  .toolbar button { padding:9px 14px; border:none; border-radius:8px; background:#2f5c46; color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
   .toolbar button.secondary { background:#fff; color:#2f5c46; border:1px solid #d7e0d5; }
+  
+  .container { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:768px) { .container { grid-template-columns:1fr; } }
+  
+  #map { width:100%; height:500px; border-radius:12px; border:1px solid #d7e0d5; }
+  
+  .list-wrap { max-height:600px; overflow-y:auto; }
   .count { font-size:13px; color:#556357; margin-bottom:12px; }
-  .card { background:#fff; border-radius:12px; padding:14px; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
-  .card .meta { font-size:11.5px; color:#6a786c; font-family:"Courier New",monospace; margin-bottom:6px; }
-  .card .desc { font-size:14px; margin-bottom:8px; }
-  .card .photos { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
-  .card .photos img { width:70px; height:70px; object-fit:cover; border-radius:8px; }
-  .card .actions { display:flex; gap:8px; }
-  .card .actions a, .card .actions button {
-    font-size:12.5px; padding:7px 10px; border-radius:7px; text-decoration:none; text-align:center; cursor:pointer; border:none;
-  }
+  .card { background:#fff; border-radius:12px; padding:12px; margin-bottom:10px; box-shadow:0 2px 6px rgba(0,0,0,0.05); }
+  .card .meta { font-size:11px; color:#6a786c; font-family:"Courier New",monospace; margin-bottom:6px; }
+  .card .desc { font-size:13px; margin-bottom:6px; }
+  .card .photos { display:flex; gap:4px; margin-bottom:8px; flex-wrap:wrap; }
+  .card .photos img { width:50px; height:50px; object-fit:cover; border-radius:6px; cursor:pointer; }
+  .card .actions { display:flex; gap:6px; }
+  .card .actions a, .card .actions button { font-size:11.5px; padding:5px 8px; border-radius:6px; text-decoration:none; text-align:center; cursor:pointer; border:none; }
   .card .actions a { background:#eaf0e9; color:#2f5c46; }
   .card .actions button { background:#a34a28; color:#fff; }
   .empty { text-align:center; color:#6a786c; font-size:14px; padding:30px 0; }
-  #app { display:none; }
+  
+  .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:100; align-items:center; justify-content:center; }
+  .modal.show { display:flex; }
+  .modal-content { background:#fff; border-radius:12px; padding:20px; max-width:90%; max-height:90%; overflow:auto; }
+  .modal-content img { max-width:100%; max-height:600px; border-radius:8px; }
+  .modal-close { position:absolute; top:10px; right:15px; font-size:28px; cursor:pointer; color:#666; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>🌿 Administrare raportări</h1>
-  <p class="sub">Doar pentru tine — lista completă a raportărilor primite prin widget.</p>
+  <p class="sub">Dashboard complet — hartă, listă și export.</p>
 
   <div class="login-card" id="login-card">
     <label for="backend-url">Link Apps Script (backend)</label>
@@ -50,16 +64,37 @@
   <div id="app">
     <div class="toolbar">
       <button id="refresh-btn">🔄 Reîmprospătează</button>
+      <button id="export-btn">📥 Export CSV</button>
       <button class="secondary" id="logout-btn">Ieșire</button>
     </div>
-    <div class="count" id="count"></div>
-    <div id="list"></div>
+    
+    <div class="container">
+      <div>
+        <h3 style="margin:0 0 10px; font-size:15px;">Hartă</h3>
+        <div id="map"></div>
+      </div>
+      <div>
+        <h3 style="margin:0 0 10px; font-size:15px;">Raportări</h3>
+        <div class="count" id="count"></div>
+        <div class="list-wrap" id="list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="photo-modal">
+  <span class="modal-close" onclick="document.getElementById('photo-modal').classList.remove('show')">&times;</span>
+  <div class="modal-content">
+    <img id="photo-modal-img" src="" alt="poza">
   </div>
 </div>
 
 <script>
 var backendUrl = "";
 var password = "";
+var map = null;
+var markers = [];
+var allReports = [];
 
 document.getElementById("login-btn").addEventListener("click", function () {
   backendUrl = document.getElementById("backend-url").value.trim();
@@ -72,6 +107,7 @@ document.getElementById("login-btn").addEventListener("click", function () {
 });
 
 document.getElementById("refresh-btn").addEventListener("click", loadReports);
+document.getElementById("export-btn").addEventListener("click", exportCSV);
 document.getElementById("logout-btn").addEventListener("click", function () {
   document.getElementById("app").style.display = "none";
   document.getElementById("login-card").style.display = "block";
@@ -90,7 +126,9 @@ function loadReports() {
       statusEl.textContent = "";
       document.getElementById("login-card").style.display = "none";
       document.getElementById("app").style.display = "block";
-      renderList(res.reports || []);
+      allReports = res.reports || [];
+      renderList(allReports);
+      renderMap(allReports);
     })
     .catch(function () {
       statusEl.textContent = "Nu am putut contacta backend-ul. Verifică link-ul.";
@@ -109,18 +147,24 @@ function renderList(reports) {
     var card = document.createElement("div");
     card.className = "card";
 
+    var date = "";
+    if (r.date) {
+      var d = new Date(r.date);
+      date = d.toLocaleDateString("ro-RO") + " " + d.toLocaleTimeString("ro-RO", {hour:"2-digit", minute:"2-digit"});
+    }
+
     var photosHtml = (r.photos || []).map(function (u) {
-      return '<img src="' + u + '" alt="poza">';
+      return '<img src="' + u + '" alt="poza" onclick="showPhoto(\'' + u.replace(/'/g, "\\'") + '\')">';
     }).join("");
 
     var mapsLink = "https://www.google.com/maps?q=" + r.lat + "," + r.lng;
 
     card.innerHTML =
-      '<div class="meta">' + (r.date || "") + " · Lat: " + r.lat + ", Lng: " + r.lng + '</div>' +
-      (r.description ? '<div class="desc">' + escapeHtml(r.description) + '</div>' : '<div class="desc" style="color:#9db09a;">(fără descriere)</div>') +
+      '<div class="meta">' + date + ' · Lat: ' + r.lat + ', Lng: ' + r.lng + '</div>' +
+      (r.description ? '<div class="desc"><strong>Descriere:</strong> ' + escapeHtml(r.description) + '</div>' : '') +
       (photosHtml ? '<div class="photos">' + photosHtml + '</div>' : '') +
       '<div class="actions">' +
-        '<a href="' + mapsLink + '" target="_blank" rel="noopener">Deschide pe hartă ↗</a>' +
+        '<a href="' + mapsLink + '" target="_blank">Hartă ↗</a>' +
         '<button data-row="' + r.row + '">Șterge</button>' +
       '</div>';
 
@@ -131,6 +175,45 @@ function renderList(reports) {
 
     listEl.appendChild(card);
   });
+}
+
+function renderMap(reports) {
+  if (!map) {
+    map = new google.maps.Map(document.getElementById("map"), {
+      center: { lat: 45.9432, lng: 24.9668 },
+      zoom: 6,
+      streetViewControl: false,
+      mapTypeControl: false,
+      fullscreenControl: false
+    });
+  }
+
+  markers.forEach(function (m) { m.setMap(null); });
+  markers = [];
+
+  reports.forEach(function (r) {
+    var marker = new google.maps.Marker({
+      position: { lat: parseFloat(r.lat), lng: parseFloat(r.lng) },
+      map: map,
+      title: r.description || "Raportare"
+    });
+
+    var infoWindow = new google.maps.InfoWindow({
+      content: '<div style="font-size:13px;"><strong>' + escapeHtml(r.description || "Raportare") + '</strong><br>' +
+               'Lat: ' + r.lat + ', Lng: ' + r.lng + '<br>' + (r.date || "") + '</div>'
+    });
+
+    marker.addListener("click", function () {
+      infoWindow.open(map, marker);
+    });
+
+    markers.push(marker);
+  });
+}
+
+function showPhoto(url) {
+  document.getElementById("photo-modal-img").src = url;
+  document.getElementById("photo-modal").classList.add("show");
 }
 
 function deleteReport(row, card) {
@@ -148,6 +231,7 @@ function deleteReport(row, card) {
     .then(function (res) {
       if (res.ok) {
         card.remove();
+        loadReports();
       } else {
         alert(res.error || "Nu am putut șterge raportarea.");
       }
@@ -155,6 +239,28 @@ function deleteReport(row, card) {
     .catch(function () {
       alert("Eroare la ștergere. Verifică conexiunea.");
     });
+}
+
+function exportCSV() {
+  if (!allReports.length) {
+    alert("Nu există raportări de exportat.");
+    return;
+  }
+
+  var csv = "Data,Latitudine,Longitudine,Descriere,Poze\n";
+  allReports.forEach(function (r) {
+    var date = r.date ? new Date(r.date).toLocaleString("ro-RO") : "";
+    csv += '"' + date.replace(/"/g, '""') + '",' +
+           r.lat + ',' + r.lng + ',' +
+           '"' + (r.description || "").replace(/"/g, '""') + '",' +
+           '"' + (r.photos || []).join("; ").replace(/"/g, '""') + '"\n';
+  });
+
+  var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  var link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "raportari-plante-invazive-" + new Date().toISOString().split("T")[0] + ".csv";
+  link.click();
 }
 
 function escapeHtml(s) {
