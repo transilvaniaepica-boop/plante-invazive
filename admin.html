@@ -33,18 +33,18 @@
   .card .meta { font-size:11px; color:#6a786c; font-family:"Courier New",monospace; margin-bottom:6px; }
   .card .desc { font-size:13px; margin-bottom:6px; }
   .card .photos { display:flex; gap:4px; margin-bottom:8px; flex-wrap:wrap; }
-  .card .photos img { width:50px; height:50px; object-fit:cover; border-radius:6px; cursor:pointer; }
+  .card .photos img { width:50px; height:50px; object-fit:cover; border-radius:6px; cursor:pointer; border:1px solid #d7e0d5; }
   .card .actions { display:flex; gap:6px; }
   .card .actions a, .card .actions button { font-size:11.5px; padding:5px 8px; border-radius:6px; text-decoration:none; text-align:center; cursor:pointer; border:none; }
   .card .actions a { background:#eaf0e9; color:#2f5c46; }
   .card .actions button { background:#a34a28; color:#fff; }
   .empty { text-align:center; color:#6a786c; font-size:14px; padding:30px 0; }
   
-  .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:100; align-items:center; justify-content:center; }
+  .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:100; align-items:center; justify-content:center; }
   .modal.show { display:flex; }
-  .modal-content { background:#fff; border-radius:12px; padding:20px; max-width:90%; max-height:90%; overflow:auto; }
+  .modal-content { position:relative; background:#fff; border-radius:12px; padding:20px; max-width:90%; max-height:90%; overflow:auto; }
   .modal-content img { max-width:100%; max-height:600px; border-radius:8px; }
-  .modal-close { position:absolute; top:10px; right:15px; font-size:28px; cursor:pointer; color:#666; }
+  .modal-close { position:absolute; top:10px; right:15px; font-size:28px; cursor:pointer; color:#666; background:none; border:none; }
 </style>
 </head>
 <body>
@@ -83,7 +83,7 @@
 </div>
 
 <div class="modal" id="photo-modal">
-  <span class="modal-close" onclick="document.getElementById('photo-modal').classList.remove('show')">&times;</span>
+  <button class="modal-close" onclick="document.getElementById('photo-modal').classList.remove('show')">&times;</button>
   <div class="modal-content">
     <img id="photo-modal-img" src="" alt="poza">
   </div>
@@ -153,8 +153,15 @@ function renderList(reports) {
       date = d.toLocaleDateString("ro-RO") + " " + d.toLocaleTimeString("ro-RO", {hour:"2-digit", minute:"2-digit"});
     }
 
-    var photosHtml = (r.photos || []).map(function (u) {
-      return '<img src="' + u + '" alt="poza" onclick="showPhoto(\'' + u.replace(/'/g, "\\'") + '\')">';
+    var photos = [];
+    try {
+      photos = JSON.parse(r.photos || "[]");
+    } catch (e) {
+      photos = [];
+    }
+
+    var photosHtml = photos.map(function (dataUrl, idx) {
+      return '<img src="' + dataUrl + '" alt="poza ' + (idx+1) + '" onclick="showPhoto(\'' + dataUrl.replace(/'/g, "\\'") + '\')" style="cursor:pointer;">';
     }).join("");
 
     var mapsLink = "https://www.google.com/maps?q=" + r.lat + "," + r.lng;
@@ -162,7 +169,7 @@ function renderList(reports) {
     card.innerHTML =
       '<div class="meta">' + date + ' · Lat: ' + r.lat + ', Lng: ' + r.lng + '</div>' +
       (r.description ? '<div class="desc"><strong>Descriere:</strong> ' + escapeHtml(r.description) + '</div>' : '') +
-      (photosHtml ? '<div class="photos">' + photosHtml + '</div>' : '') +
+      (photosHtml ? '<div class="photos">' + photosHtml + '</div>' : '<div class="desc" style="color:#9db09a;">(fără poze)</div>') +
       '<div class="actions">' +
         '<a href="' + mapsLink + '" target="_blank">Hartă ↗</a>' +
         '<button data-row="' + r.row + '">Șterge</button>' +
@@ -211,8 +218,8 @@ function renderMap(reports) {
   });
 }
 
-function showPhoto(url) {
-  document.getElementById("photo-modal-img").src = url;
+function showPhoto(dataUrl) {
+  document.getElementById("photo-modal-img").src = dataUrl;
   document.getElementById("photo-modal").classList.add("show");
 }
 
@@ -247,19 +254,18 @@ function exportCSV() {
     return;
   }
 
-  var csv = "Data,Latitudine,Longitudine,Descriere,Poze\n";
+  var csv = "Data,Latitudine,Longitudine,Descriere\n";
   allReports.forEach(function (r) {
     var date = r.date ? new Date(r.date).toLocaleString("ro-RO") : "";
     csv += '"' + date.replace(/"/g, '""') + '",' +
            r.lat + ',' + r.lng + ',' +
-           '"' + (r.description || "").replace(/"/g, '""') + '",' +
-           '"' + (r.photos || []).join("; ").replace(/"/g, '""') + '"\n';
+           '"' + (r.description || "").replace(/"/g, '""') + '"\n';
   });
 
   var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   var link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = "raportari-plante-invazive-" + new Date().toISOString().split("T")[0] + ".csv";
+  link.download = "raportari-" + new Date().toISOString().split("T")[0] + ".csv";
   link.click();
 }
 
