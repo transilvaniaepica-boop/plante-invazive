@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administrare raportări — plante invazive</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Arial, sans-serif; background:#eaf0e9; margin:0; padding:20px 14px 60px; color:#1c231f; }
+  .wrap { max-width:720px; margin:0 auto; }
+  h1 { font-size:19px; color:#2f5c46; margin:0 0 4px; }
+  p.sub { font-size:13px; color:#556357; margin:0 0 16px; }
+  .login-card { background:#fff; border-radius:14px; padding:20px; box-shadow:0 2px 10px rgba(0,0,0,0.08); max-width:360px; margin:0 auto; }
+  .login-card label { font-size:13px; font-weight:600; display:block; margin-bottom:6px; }
+  .login-card input { width:100%; padding:10px; border:1px solid #d7e0d5; border-radius:8px; font-size:14px; margin-bottom:10px; }
+  .login-card button, .toolbar button { width:100%; padding:11px; border:none; border-radius:8px; background:#2f5c46; color:#fff; font-weight:700; font-size:14px; cursor:pointer; }
+  .status { font-size:13px; color:#a34a28; margin-top:8px; min-height:16px; }
+  .toolbar { display:flex; gap:8px; margin-bottom:14px; }
+  .toolbar button { width:auto; padding:9px 14px; font-size:13px; }
+  .toolbar button.secondary { background:#fff; color:#2f5c46; border:1px solid #d7e0d5; }
+  .count { font-size:13px; color:#556357; margin-bottom:12px; }
+  .card { background:#fff; border-radius:12px; padding:14px; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+  .card .meta { font-size:11.5px; color:#6a786c; font-family:"Courier New",monospace; margin-bottom:6px; }
+  .card .desc { font-size:14px; margin-bottom:8px; }
+  .card .photos { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .card .photos img { width:70px; height:70px; object-fit:cover; border-radius:8px; }
+  .card .actions { display:flex; gap:8px; }
+  .card .actions a, .card .actions button {
+    font-size:12.5px; padding:7px 10px; border-radius:7px; text-decoration:none; text-align:center; cursor:pointer; border:none;
+  }
+  .card .actions a { background:#eaf0e9; color:#2f5c46; }
+  .card .actions button { background:#a34a28; color:#fff; }
+  .empty { text-align:center; color:#6a786c; font-size:14px; padding:30px 0; }
+  #app { display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🌿 Administrare raportări</h1>
+  <p class="sub">Doar pentru tine — lista completă a raportărilor primite prin widget.</p>
+
+  <div class="login-card" id="login-card">
+    <label for="backend-url">Link Apps Script (backend)</label>
+    <input type="text" id="backend-url" placeholder="https://script.google.com/macros/s/.../exec">
+    <label for="password">Parolă administrator</label>
+    <input type="password" id="password" placeholder="parola ta">
+    <button id="login-btn">Vezi raportările</button>
+    <div class="status" id="login-status"></div>
+  </div>
+
+  <div id="app">
+    <div class="toolbar">
+      <button id="refresh-btn">🔄 Reîmprospătează</button>
+      <button class="secondary" id="logout-btn">Ieșire</button>
+    </div>
+    <div class="count" id="count"></div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<script>
+var backendUrl = "";
+var password = "";
+
+document.getElementById("login-btn").addEventListener("click", function () {
+  backendUrl = document.getElementById("backend-url").value.trim();
+  password = document.getElementById("password").value;
+  if (!backendUrl || !password) {
+    document.getElementById("login-status").textContent = "Completează ambele câmpuri.";
+    return;
+  }
+  loadReports();
+});
+
+document.getElementById("refresh-btn").addEventListener("click", loadReports);
+document.getElementById("logout-btn").addEventListener("click", function () {
+  document.getElementById("app").style.display = "none";
+  document.getElementById("login-card").style.display = "block";
+});
+
+function loadReports() {
+  var statusEl = document.getElementById("login-status");
+  statusEl.textContent = "Se încarcă...";
+  fetch(backendUrl + "?admin=1&password=" + encodeURIComponent(password))
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      if (!res.ok) {
+        statusEl.textContent = res.error || "Parolă incorectă.";
+        return;
+      }
+      statusEl.textContent = "";
+      document.getElementById("login-card").style.display = "none";
+      document.getElementById("app").style.display = "block";
+      renderList(res.reports || []);
+    })
+    .catch(function () {
+      statusEl.textContent = "Nu am putut contacta backend-ul. Verifică link-ul.";
+    });
+}
+
+function renderList(reports) {
+  var listEl = document.getElementById("list");
+  document.getElementById("count").textContent = reports.length + " raportări";
+  if (!reports.length) {
+    listEl.innerHTML = '<div class="empty">Nu există raportări încă.</div>';
+    return;
+  }
+  listEl.innerHTML = "";
+  reports.slice().reverse().forEach(function (r) {
+    var card = document.createElement("div");
+    card.className = "card";
+
+    var photosHtml = (r.photos || []).map(function (u) {
+      return '<img src="' + u + '" alt="poza">';
+    }).join("");
+
+    var mapsLink = "https://www.google.com/maps?q=" + r.lat + "," + r.lng;
+
+    card.innerHTML =
+      '<div class="meta">' + (r.date || "") + " · Lat: " + r.lat + ", Lng: " + r.lng + '</div>' +
+      (r.description ? '<div class="desc">' + escapeHtml(r.description) + '</div>' : '<div class="desc" style="color:#9db09a;">(fără descriere)</div>') +
+      (photosHtml ? '<div class="photos">' + photosHtml + '</div>' : '') +
+      '<div class="actions">' +
+        '<a href="' + mapsLink + '" target="_blank" rel="noopener">Deschide pe hartă ↗</a>' +
+        '<button data-row="' + r.row + '">Șterge</button>' +
+      '</div>';
+
+    card.querySelector("button").addEventListener("click", function () {
+      if (!confirm("Ștergi definitiv această raportare?")) return;
+      deleteReport(r.row, card);
+    });
+
+    listEl.appendChild(card);
+  });
+}
+
+function deleteReport(row, card) {
+  var form = new URLSearchParams();
+  form.set("action", "delete");
+  form.set("row", row);
+  form.set("password", password);
+
+  fetch(backendUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form.toString()
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      if (res.ok) {
+        card.remove();
+      } else {
+        alert(res.error || "Nu am putut șterge raportarea.");
+      }
+    })
+    .catch(function () {
+      alert("Eroare la ștergere. Verifică conexiunea.");
+    });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[<>"']/g, function (c) {
+    return { "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+</script>
+</body>
+</html>
