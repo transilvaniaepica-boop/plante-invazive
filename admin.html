@@ -153,15 +153,8 @@ function renderList(reports) {
       date = d.toLocaleDateString("ro-RO") + " " + d.toLocaleTimeString("ro-RO", {hour:"2-digit", minute:"2-digit"});
     }
 
-    var photos = [];
-    try {
-      photos = JSON.parse(r.photos || "[]");
-    } catch (e) {
-      photos = [];
-    }
-
-    var photosHtml = photos.map(function (dataUrl, idx) {
-      return '<img src="' + dataUrl + '" alt="poza ' + (idx+1) + '" onclick="showPhoto(\'' + dataUrl.replace(/'/g, "\\'") + '\')" style="cursor:pointer;">';
+    var photosHtml = (r.photoIds || []).map(function (photoId) {
+      return '<img src="' + backendUrl + '?photo_id=' + photoId + '" alt="poza" onclick="showPhoto(\'' + backendUrl + '?photo_id=' + photoId + '\')" style="cursor:pointer;">';
     }).join("");
 
     var mapsLink = "https://www.google.com/maps?q=" + r.lat + "," + r.lng;
