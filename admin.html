@@ -16,35 +16,36 @@
   .login-card input { width:100%; padding:10px; border:1px solid #d7e0d5; border-radius:8px; font-size:14px; margin-bottom:10px; }
   .login-card button { width:100%; padding:11px; border:none; border-radius:8px; background:#2f5c46; color:#fff; font-weight:700; font-size:14px; cursor:pointer; }
   .status { font-size:13px; color:#a34a28; margin-top:8px; min-height:16px; }
-  
+
   #app { display:none; }
   .toolbar { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
   .toolbar button { padding:9px 14px; border:none; border-radius:8px; background:#2f5c46; color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
   .toolbar button.secondary { background:#fff; color:#2f5c46; border:1px solid #d7e0d5; }
-  
+
   .container { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   @media (max-width:768px) { .container { grid-template-columns:1fr; } }
-  
+
   #map { width:100%; height:500px; border-radius:12px; border:1px solid #d7e0d5; }
-  
+
   .list-wrap { max-height:600px; overflow-y:auto; }
   .count { font-size:13px; color:#556357; margin-bottom:12px; }
   .card { background:#fff; border-radius:12px; padding:12px; margin-bottom:10px; box-shadow:0 2px 6px rgba(0,0,0,0.05); }
   .card .meta { font-size:11px; color:#6a786c; font-family:"Courier New",monospace; margin-bottom:6px; }
   .card .desc { font-size:13px; margin-bottom:6px; }
-  .card .photos { display:flex; gap:4px; margin-bottom:8px; flex-wrap:wrap; }
+  .card .photos { display:flex; gap:4px; margin-bottom:8px; flex-wrap:wrap; min-height:1px; }
   .card .photos img { width:50px; height:50px; object-fit:cover; border-radius:6px; cursor:pointer; border:1px solid #d7e0d5; }
+  .card .photos .ph-note { font-size:11px; color:#9db09a; }
   .card .actions { display:flex; gap:6px; }
   .card .actions a, .card .actions button { font-size:11.5px; padding:5px 8px; border-radius:6px; text-decoration:none; text-align:center; cursor:pointer; border:none; }
   .card .actions a { background:#eaf0e9; color:#2f5c46; }
   .card .actions button { background:#a34a28; color:#fff; }
   .empty { text-align:center; color:#6a786c; font-size:14px; padding:30px 0; }
-  
+
   .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:100; align-items:center; justify-content:center; }
   .modal.show { display:flex; }
   .modal-content { position:relative; background:#fff; border-radius:12px; padding:20px; max-width:90%; max-height:90%; overflow:auto; }
-  .modal-content img { max-width:100%; max-height:600px; border-radius:8px; }
-  .modal-close { position:absolute; top:10px; right:15px; font-size:28px; cursor:pointer; color:#666; background:none; border:none; }
+  .modal-content img { max-width:100%; max-height:600px; border-radius:8px; display:block; }
+  .modal-close { position:absolute; top:6px; right:10px; font-size:28px; cursor:pointer; color:#666; background:none; border:none; line-height:1; }
 </style>
 </head>
 <body>
@@ -67,7 +68,7 @@
       <button id="export-btn">📥 Export CSV</button>
       <button class="secondary" id="logout-btn">Ieșire</button>
     </div>
-    
+
     <div class="container">
       <div>
         <h3 style="margin:0 0 10px; font-size:15px;">Hartă</h3>
@@ -83,7 +84,7 @@
 </div>
 
 <div class="modal" id="photo-modal">
-  <button class="modal-close" onclick="document.getElementById('photo-modal').classList.remove('show')">&times;</button>
+  <button class="modal-close" id="modal-close-btn">&times;</button>
   <div class="modal-content">
     <img id="photo-modal-img" src="" alt="poza">
   </div>
@@ -95,6 +96,10 @@ var password = "";
 var map = null;
 var markers = [];
 var allReports = [];
+
+document.getElementById("modal-close-btn").addEventListener("click", function () {
+  document.getElementById("photo-modal").classList.remove("show");
+});
 
 document.getElementById("login-btn").addEventListener("click", function () {
   backendUrl = document.getElementById("backend-url").value.trim();
@@ -143,6 +148,7 @@ function renderList(reports) {
     return;
   }
   listEl.innerHTML = "";
+
   reports.slice().reverse().forEach(function (r) {
     var card = document.createElement("div");
     card.className = "card";
@@ -150,30 +156,62 @@ function renderList(reports) {
     var date = "";
     if (r.date) {
       var d = new Date(r.date);
-      date = d.toLocaleDateString("ro-RO") + " " + d.toLocaleTimeString("ro-RO", {hour:"2-digit", minute:"2-digit"});
+      date = d.toLocaleDateString("ro-RO") + " " + d.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
     }
 
-    var photosHtml = (r.photoIds || []).map(function (photoId) {
-      return '<img src="' + backendUrl + '?photo_id=' + photoId + '" alt="poza" onclick="showPhoto(\'' + backendUrl + '?photo_id=' + photoId + '\')" style="cursor:pointer;">';
-    }).join("");
-
     var mapsLink = "https://www.google.com/maps?q=" + r.lat + "," + r.lng;
+    var photoIds = r.photoIds || [];
+
+    var photosDiv = document.createElement("div");
+    photosDiv.className = "photos";
+    if (photoIds.length) {
+      var note = document.createElement("span");
+      note.className = "ph-note";
+      note.textContent = "Se încarcă " + photoIds.length + " poze...";
+      photosDiv.appendChild(note);
+    } else {
+      var note2 = document.createElement("span");
+      note2.className = "ph-note";
+      note2.textContent = "(fără poze)";
+      photosDiv.appendChild(note2);
+    }
 
     card.innerHTML =
-      '<div class="meta">' + date + ' · Lat: ' + r.lat + ', Lng: ' + r.lng + '</div>' +
-      (r.description ? '<div class="desc"><strong>Descriere:</strong> ' + escapeHtml(r.description) + '</div>' : '') +
-      (photosHtml ? '<div class="photos">' + photosHtml + '</div>' : '<div class="desc" style="color:#9db09a;">(fără poze)</div>') +
-      '<div class="actions">' +
-        '<a href="' + mapsLink + '" target="_blank">Hartă ↗</a>' +
-        '<button data-row="' + r.row + '">Șterge</button>' +
-      '</div>';
+      '<div class="meta">' + date + " · Lat: " + r.lat + ", Lng: " + r.lng + '</div>' +
+      (r.description ? '<div class="desc"><strong>Descriere:</strong> ' + escapeHtml(r.description) + '</div>' : '');
 
-    card.querySelector("button").addEventListener("click", function () {
+    card.appendChild(photosDiv);
+
+    var actionsDiv = document.createElement("div");
+    actionsDiv.className = "actions";
+    actionsDiv.innerHTML =
+      '<a href="' + mapsLink + '" target="_blank">Hartă ↗</a>' +
+      '<button>Șterge</button>';
+    actionsDiv.querySelector("button").addEventListener("click", function () {
       if (!confirm("Ștergi definitiv această raportare?")) return;
       deleteReport(r.row, card);
     });
+    card.appendChild(actionsDiv);
 
     listEl.appendChild(card);
+
+    if (photoIds.length) {
+      photosDiv.innerHTML = "";
+      photoIds.forEach(function (photoId) {
+        fetch(backendUrl + "?photo_id=" + encodeURIComponent(photoId))
+          .then(function (resp) { return resp.json(); })
+          .then(function (res) {
+            if (res && res.dataUrl) {
+              var img = document.createElement("img");
+              img.src = res.dataUrl;
+              img.alt = "poza";
+              img.addEventListener("click", function () { showPhoto(res.dataUrl); });
+              photosDiv.appendChild(img);
+            }
+          })
+          .catch(function () { /* silent */ });
+      });
+    }
   });
 }
 
@@ -200,7 +238,7 @@ function renderMap(reports) {
 
     var infoWindow = new google.maps.InfoWindow({
       content: '<div style="font-size:13px;"><strong>' + escapeHtml(r.description || "Raportare") + '</strong><br>' +
-               'Lat: ' + r.lat + ', Lng: ' + r.lng + '<br>' + (r.date || "") + '</div>'
+        "Lat: " + r.lat + ", Lng: " + r.lng + "<br>" + (r.date || "") + '</div>'
     });
 
     marker.addListener("click", function () {
@@ -231,7 +269,6 @@ function deleteReport(row, card) {
     .then(function (res) {
       if (res.ok) {
         card.remove();
-        loadReports();
       } else {
         alert(res.error || "Nu am putut șterge raportarea.");
       }
@@ -246,15 +283,13 @@ function exportCSV() {
     alert("Nu există raportări de exportat.");
     return;
   }
-
   var csv = "Data,Latitudine,Longitudine,Descriere\n";
   allReports.forEach(function (r) {
     var date = r.date ? new Date(r.date).toLocaleString("ro-RO") : "";
     csv += '"' + date.replace(/"/g, '""') + '",' +
-           r.lat + ',' + r.lng + ',' +
-           '"' + (r.description || "").replace(/"/g, '""') + '"\n';
+      r.lat + "," + r.lng + "," +
+      '"' + (r.description || "").replace(/"/g, '""') + '"\n';
   });
-
   var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   var link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
