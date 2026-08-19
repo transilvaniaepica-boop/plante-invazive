@@ -198,21 +198,77 @@ function renderList(reports) {
     if (photoIds.length) {
       photosDiv.innerHTML = "";
       photoIds.forEach(function (photoId) {
-        fetch(backendUrl + "?photo_id=" + encodeURIComponent(photoId))
-          .then(function (resp) { return resp.json(); })
-          .then(function (res) {
-            if (res && res.dataUrl) {
-              var img = document.createElement("img");
-              img.src = res.dataUrl;
-              img.alt = "poza";
-              img.addEventListener("click", function () { showPhoto(res.dataUrl); });
-              photosDiv.appendChild(img);
-            }
-          })
-          .catch(function () { /* silent */ });
+        queuePhotoLoad(photoId, photosDiv);
       });
     }
   });
+}
+
+// --- coada de incarcare a pozelor, limitata, ca sa nu suprasolicite Apps Script ---
+var photoQueue = [];
+var activeLoads = 0;
+var MAX_CONCURRENT_LOADS = 2;
+var photoCache = {};
+
+function queuePhotoLoad(photoId, container) {
+  photoQueue.push({ photoId: photoId, container: container });
+  processPhotoQueue();
+}
+
+function processPhotoQueue() {
+  while (activeLoads < MAX_CONCURRENT_LOADS && photoQueue.length > 0) {
+    var item = photoQueue.shift();
+    activeLoads++;
+    fetchPhoto(item.photoId, item.container, 0);
+  }
+}
+
+function fetchPhoto(photoId, container, attempt) {
+  if (photoCache[photoId]) {
+    appendPhotoImg(photoCache[photoId], container);
+    activeLoads--;
+    processPhotoQueue();
+    return;
+  }
+
+  fetch(backendUrl + "?photo_id=" + encodeURIComponent(photoId))
+    .then(function (resp) { return resp.json(); })
+    .then(function (res) {
+      activeLoads--;
+      if (res && res.dataUrl) {
+        photoCache[photoId] = res.dataUrl;
+        appendPhotoImg(res.dataUrl, container);
+      } else if (attempt < 2) {
+        photoQueue.push({ photoId: photoId, container: container });
+      } else {
+        appendPhotoError(container);
+      }
+      processPhotoQueue();
+    })
+    .catch(function () {
+      activeLoads--;
+      if (attempt < 2) {
+        photoQueue.push({ photoId: photoId, container: container });
+      } else {
+        appendPhotoError(container);
+      }
+      processPhotoQueue();
+    });
+}
+
+function appendPhotoImg(dataUrl, container) {
+  var note = container.querySelector(".ph-note");
+  if (note) note.remove();
+  var img = document.createElement("img");
+  img.src = dataUrl;
+  img.alt = "poza";
+  img.addEventListener("click", function () { showPhoto(dataUrl); });
+  container.appendChild(img);
+}
+
+function appendPhotoError(container) {
+  var note = container.querySelector(".ph-note");
+  if (note) note.textContent = "(nu s-a putut încărca o poză)";
 }
 
 function renderMap(reports) {
