@@ -56,7 +56,9 @@
   <div class="login-card" id="login-card">
     <label for="backend-url">Link Apps Script (backend)</label>
     <input type="text" id="backend-url" placeholder="https://script.google.com/macros/s/.../exec">
-    <label for="password">Parolă administrator</label>
+    <label for="username">Utilizator (doar pentru cont Autoritate)</label>
+    <input type="text" id="username" placeholder="autoritate">
+    <label for="password">Parolă</label>
     <input type="password" id="password" placeholder="parola ta">
     <button id="login-btn">Vezi raportările</button>
     <div class="status" id="login-status"></div>
@@ -68,6 +70,7 @@
       <button id="export-btn">📥 Export CSV</button>
       <button class="secondary" id="logout-btn">Ieșire</button>
     </div>
+    <div class="count" id="role-badge" style="font-weight:700;"></div>
 
     <div class="container">
       <div>
@@ -93,6 +96,8 @@
 <script>
 var backendUrl = "";
 var password = "";
+var username = "";
+var currentRole = "admin";
 var map = null;
 var markers = [];
 var allReports = [];
@@ -103,9 +108,10 @@ document.getElementById("modal-close-btn").addEventListener("click", function ()
 
 document.getElementById("login-btn").addEventListener("click", function () {
   backendUrl = document.getElementById("backend-url").value.trim();
+  username = document.getElementById("username").value.trim();
   password = document.getElementById("password").value;
   if (!backendUrl || !password) {
-    document.getElementById("login-status").textContent = "Completează ambele câmpuri.";
+    document.getElementById("login-status").textContent = "Completează linkul și parola.";
     return;
   }
   loadReports();
@@ -121,16 +127,27 @@ document.getElementById("logout-btn").addEventListener("click", function () {
 function loadReports() {
   var statusEl = document.getElementById("login-status");
   statusEl.textContent = "Se încarcă...";
-  fetch(backendUrl + "?admin=1&password=" + encodeURIComponent(password))
+
+  photoQueue = [];
+  activeLoads = 0;
+
+  var url = backendUrl + "?admin=1&password=" + encodeURIComponent(password) +
+    "&username=" + encodeURIComponent(username) +
+    "&_ts=" + Date.now();
+
+  fetch(url, { cache: "no-store" })
     .then(function (r) { return r.json(); })
     .then(function (res) {
       if (!res.ok) {
-        statusEl.textContent = res.error || "Parolă incorectă.";
+        statusEl.textContent = res.error || "Date de logare incorecte.";
         return;
       }
       statusEl.textContent = "";
+      currentRole = res.role || "admin";
       document.getElementById("login-card").style.display = "none";
       document.getElementById("app").style.display = "block";
+      document.getElementById("role-badge").textContent =
+        currentRole === "autoritate" ? "👁 Cont Autoritate (doar vizualizare)" : "🔑 Cont Administrator";
       allReports = res.reports || [];
       renderList(allReports);
       renderMap(allReports);
@@ -184,13 +201,16 @@ function renderList(reports) {
 
     var actionsDiv = document.createElement("div");
     actionsDiv.className = "actions";
-    actionsDiv.innerHTML =
-      '<a href="' + mapsLink + '" target="_blank">Hartă ↗</a>' +
-      '<button>Șterge</button>';
-    actionsDiv.querySelector("button").addEventListener("click", function () {
-      if (!confirm("Ștergi definitiv această raportare?")) return;
-      deleteReport(r.row, card);
-    });
+    actionsDiv.innerHTML = '<a href="' + mapsLink + '" target="_blank">Hartă ↗</a>';
+    if (currentRole !== "autoritate") {
+      var delBtn = document.createElement("button");
+      delBtn.textContent = "Șterge";
+      delBtn.addEventListener("click", function () {
+        if (!confirm("Ștergi definitiv această raportare?")) return;
+        deleteReport(r.row, card);
+      });
+      actionsDiv.appendChild(delBtn);
+    }
     card.appendChild(actionsDiv);
 
     listEl.appendChild(card);
@@ -204,7 +224,6 @@ function renderList(reports) {
   });
 }
 
-// --- coada de incarcare a pozelor, limitata, ca sa nu suprasolicite Apps Script ---
 var photoQueue = [];
 var activeLoads = 0;
 var MAX_CONCURRENT_LOADS = 2;
